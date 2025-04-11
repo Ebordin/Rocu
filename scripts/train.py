@@ -1,37 +1,31 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
-import tensorflow as tf
+import requests
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+import joblib
 import os
+from datetime import datetime
 
-# Ensure the data file exists
-if not os.path.exists("data/train.csv"):
-    print("data/train.csv not found. Creating example training data...")
-    example_data = {
-        'feature1': [0.1, 0.4, 0.5, 0.8, 0.3],
-        'feature2': [1, 0, 1, 0, 1],
-        'feature3': [5.2, 3.1, 4.8, 2.7, 3.3],
-        'target': [0, 1, 0, 1, 0]
-    }
-    df = pd.DataFrame(example_data)
-    os.makedirs("data", exist_ok=True)
-    df.to_csv("data/train.csv", index=False)
+# Step 1: Download a sample Python code dataset
+url = "https://raw.githubusercontent.com/sobolevn/awesome-cryptography/master/README.md"
+response = requests.get(url)
+response.raise_for_status()
 
-# Load data
-data = pd.read_csv("data/train.csv")
-X = data.drop('target', axis=1)
-y = data['target']
-X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2)
+# Step 2: Treat the content as a list of pseudo code snippets split by empty lines
+code_snippets = response.text.split('\n\n')
 
-# Define and train model
-model = tf.keras.Sequential([
-    tf.keras.layers.Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
-    tf.keras.layers.Dense(1, activation='sigmoid')
-])
+# Step 3: Vectorize the code snippets
+vectorizer = TfidfVectorizer(max_features=500, stop_words="english")
+X = vectorizer.fit_transform(code_snippets)
 
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-model.fit(X_train, y_train, epochs=10, validation_data=(X_val, y_val))
+# Step 4: Train KMeans model on vectorized code
+model = KMeans(n_clusters=5, random_state=42)
+model.fit(X)
 
-# Save the model
+# Step 5: Save the model
 os.makedirs("models", exist_ok=True)
-model.save("models/rocu_classifier.h5")
-print("✅ Model saved successfully at models/rocu_classifier.h5")
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+model_path = f"models/rocu_code_kmeans_{timestamp}.pkl"
+joblib.dump(model, model_path)
+print(f"Code clustering model saved at {model_path}")
+
